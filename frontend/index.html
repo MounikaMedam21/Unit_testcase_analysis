@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Coverage Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="text-center mb-5">
+            <h1><i class="bi bi-graph-up-arrow me-3"></i>Test Coverage Analyzer</h1>
+            <p class="lead text-muted">Analyze your code coverage and generate missing test cases automatically</p>
+        </div>
+        
+        <div class="card mb-4 fade-in">
+            <div class="card-header">
+                <h5><i class="bi bi-github me-2"></i>Repository Analysis</h5>
+            </div>
+            <div class="card-body">
+                <form id="analysisForm">
+                    <div class="mb-3">
+                        <label for="githubUrl" class="form-label">
+                            <i class="bi bi-link-45deg me-2"></i>Repository URL
+                        </label>
+                        <input type="text" class="form-control" id="githubUrl" 
+                               placeholder="https://github.com/username/repository" required>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Enter the full repository URL to analyze test coverage (GitHub or Azure DevOps)
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="useAzureSwitch">
+                            <label class="form-check-label" for="useAzureSwitch">
+                                Analyze an Azure DevOps repository
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="azureSection" class="border rounded p-3 mb-3 d-none">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="azureOrg" class="form-label">Azure Organization</label>
+                                <input type="text" class="form-control" id="azureOrg" placeholder="myorg">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="azureProject" class="form-label">Azure Project</label>
+                                <input type="text" class="form-control" id="azureProject" placeholder="myproject">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="azurePat" class="form-label">Azure PAT</label>
+                                <input type="password" class="form-control" id="azurePat" placeholder="Personal Access Token">
+                            </div>
+                        </div>
+                        <div class="row g-3 mt-3">
+                            <div class="col-md-6">
+                                <label for="azureRepoSelect" class="form-label">Select Repository</label>
+                                <select id="azureRepoSelect" class="form-select">
+                                    <option value="">-- Fetch repositories first --</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button id="fetchAzureRepos" type="button" class="btn btn-outline-primary w-100">
+                                    <i class="bi bi-download me-2"></i>Fetch Repos
+                                </button>
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button id="syncRepoUrl" type="button" class="btn btn-outline-success w-100">
+                                    <i class="bi bi-arrow-repeat me-2"></i>Sync URL
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-text mt-2">
+                            We only use your PAT to list and clone the selected repo. It is not stored.
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search me-2"></i>Analyze Repository
+                    </button>
+                </form>
+                
+                <div id="analysisProgress" class="mt-3 d-none">
+                    <div class="alert alert-info">
+                        <i class="bi bi-hourglass-split me-2"></i>
+                        <strong>Analysis in Progress...</strong>
+                        <div class="mt-2">
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" style="width: 100%"></div>
+                            </div>
+                        </div>
+                        <small class="text-muted">This may take several minutes for large repositories</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="resultsSection" class="d-none">
+            <div class="card mb-4 slide-in">
+                <div class="card-header">
+                    <h5><i class="bi bi-pie-chart me-2"></i>Coverage Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Overall Coverage</label>
+                                <div class="progress mb-2" style="height: 30px;">
+                                    <div id="coverageProgress" class="progress-bar" role="progressbar" 
+                                         style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                                </div>
+                                <small class="text-muted">Function coverage percentage</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="row">
+                                <div class="col-4 text-center">
+                                    <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-2" 
+                                         style="width: 60px; height: 60px;">
+                                        <span id="totalFunctions" class="fw-bold fs-4">0</span>
+                                    </div>
+                                    <div class="small text-muted">Total Functions</div>
+                                </div>
+                                <div class="col-4 text-center">
+                                    <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-2" 
+                                         style="width: 60px; height: 60px;">
+                                        <span id="coveredFunctions" class="fw-bold fs-4">0</span>
+                                    </div>
+                                    <div class="small text-muted">Covered</div>
+                                </div>
+                                <div class="col-4 text-center">
+                                    <div class="bg-danger text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-2" 
+                                         style="width: 60px; height: 60px;">
+                                        <span id="uncoveredFunctions" class="fw-bold fs-4">0</span>
+                                    </div>
+                                    <div class="small text-muted">Uncovered</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4 slide-in">
+                <div class="card-header">
+                    <h5><i class="bi bi-gear me-2"></i>Project Detection</h5>
+                </div>
+                <div class="card-body">
+                    <div id="repositoryTypeInfo" class="alert alert-info d-none">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong id="repoTypeTitle">Repository Type</strong>
+                        <div id="repoTypeMessage" class="mt-2"></div>
+                    </div>
+                    
+                    <div id="repositorySizeWarning" class="alert alert-warning d-none">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong>Large Repository Detected:</strong> This repository contains many files. 
+                        Analysis has been limited to the most relevant files for performance. 
+                        <br><br>
+                        <strong>Analysis Scope:</strong> <span id="analysisScope">0</span> source files, 
+                        <span id="testFilesCount">0</span> test files analyzed.
+                        <br>
+                        <strong>Note:</strong> Consider analyzing specific modules or directories for more detailed results.
+                    </div>
+                    
+                    <div id="repositoryTypeWarning" class="alert alert-warning d-none">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong id="repoTypeWarningTitle">Repository Type Warning</strong>
+                        <div id="repoTypeWarningMessage" class="mt-2"></div>
+                    </div>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center p-3 bg-light rounded">
+                                <i class="bi bi-code-slash fs-4 me-3 text-primary"></i>
+                                <div>
+                                    <div class="small text-muted mb-1">Programming Language</div>
+                                    <span id="detectedLanguage" class="badge bg-info project-detection-badge">Not detected</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center p-3 bg-light rounded">
+                                <i class="bi bi-tools fs-4 me-3 text-warning"></i>
+                                <div>
+                                    <div class="small text-muted mb-1">Testing Framework</div>
+                                    <span id="detectedFramework" class="badge bg-warning project-detection-badge">Not detected</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center p-3 bg-light rounded">
+                                <i class="bi bi-speedometer2 fs-4 me-3 text-secondary"></i>
+                                <div>
+                                    <div class="small text-muted mb-1">Coverage Tool</div>
+                                    <span id="coverageTool" class="badge bg-secondary project-detection-badge">Not detected</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center p-3 bg-light rounded">
+                                <i class="bi bi-shield-check fs-4 me-3 text-info"></i>
+                                <div>
+                                    <div class="small text-muted mb-1">Coverage Mode</div>
+                                    <span id="coverageMode" class="badge bg-info project-detection-badge">Heuristic</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4 slide-in">
+                <div class="card-header">
+                    <h5><i class="bi bi-file-earmark-text me-2"></i>Generated Coverage Files</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Note:</strong> Coverage files are generated temporarily during analysis and cleaned up afterward. 
+                        The paths shown below indicate where they were created during the analysis process.
+                    </div>
+                    <div id="coverageFilesList">
+                        <p class="text-muted text-center py-3">
+                            <i class="bi bi-hourglass-split fs-3 d-block mb-2"></i>
+                            Coverage files will be displayed here after analysis.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4 slide-in">
+                <div class="card-header">
+                    <h5><i class="bi bi-exclamation-triangle me-2"></i>Uncovered Functions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                    <th><i class="bi bi-function me-2"></i>Function Name</th>
+                                    <th class="text-center"><i class="bi bi-magic me-2"></i>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="uncoveredFunctionsList">
+                            <!-- Will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4 d-none slide-in" id="generatedTestCard">
+                <div class="card-header">
+                    <h5><i class="bi bi-code-square me-2"></i>Test Comparison</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-3">
+                                <i class="bi bi-file-earmark-code me-2"></i>Existing Tests
+                            </h6>
+                            <pre id="existingTestCode" class="test-code"></pre>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-3">
+                                <i class="bi bi-plus-circle me-2"></i>Combined Tests (New in Green)
+                            </h6>
+                            <pre id="combinedTestCode" class="test-code"></pre>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <button id="copyTestBtn" class="btn btn-secondary me-3">
+                            <i class="bi bi-clipboard me-2"></i>Copy Combined Tests
+                        </button>
+                        <button id="copyNewOnlyBtn" class="btn btn-success">
+                            <i class="bi bi-clipboard-plus me-2"></i>Copy New Tests Only
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-center mb-4 slide-in">
+                <button id="downloadReportBtn" class="btn btn-primary btn-lg">
+                    <i class="bi bi-download me-2"></i>Download Full Report
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/script.js"></script>
+</body>
+</html>
